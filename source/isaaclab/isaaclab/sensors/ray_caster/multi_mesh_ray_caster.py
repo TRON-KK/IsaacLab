@@ -77,6 +77,13 @@ class MultiMeshRayCaster(RayCaster):
     cfg: MultiMeshRayCasterCfg
     """The configuration parameters."""
 
+    meshes: ClassVar[dict[str, wp.Mesh]] = {}
+    """Global cache of Warp meshes shared across all ``MultiMeshRayCaster`` instances.
+
+    Keyed by the absolute prim path that was parsed; lets a second sensor reuse a mesh
+    that an earlier sensor already uploaded to Warp.
+    """
+
     mesh_offsets: dict[str, tuple[torch.Tensor, torch.Tensor]] = {}
 
     mesh_views: ClassVar[dict[str, XformPrimView | physx.ArticulationView | physx.RigidBodyView]] = {}
@@ -395,7 +402,9 @@ class MultiMeshRayCaster(RayCaster):
         )
 
         if self.cfg.update_mesh_ids:
-            self._data.ray_mesh_ids[env_ids] = mesh_ids
+            # raycast_dynamic_meshes returns (B, N); buffer keeps the documented (..., 1) shape
+            target_slice = self._data.ray_mesh_ids[env_ids]
+            self._data.ray_mesh_ids[env_ids] = mesh_ids.view(target_slice.shape)
 
     def __del__(self):
         super().__del__()
